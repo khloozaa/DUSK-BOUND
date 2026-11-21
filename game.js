@@ -1048,7 +1048,84 @@ function drawEffect(e, cam) {
   ctx.restore();
 }
 
+/* ------------------------------------------------------------------ */
+/*  AUDIO: background music + sound effects (all from sound_effects/)  */
+/* ------------------------------------------------------------------ */
+
+const SOUND_DIR = "sound_effects/";
+const SOUND_FILES = {
+  sword: "swordsound.mp3",
+  mushroom: "mushrom attack.mp3",
+  goblin: "goblin_attack.mp3",
+  golemAttack: "large-monster-attack.mp3",
+  golemSpawn: "large_monester_apper.mp3",
+  gameOver: "gameover.mp3",
+  victory: "vectory.mp3",
+};
+const SOUND_VOLUME = {
+  sword: 0.7,
+  mushroom: 0.7,
+  goblin: 0.7,
+  golemAttack: 0.9,
+  golemSpawn: 1.0,
+  gameOver: 0.9,
+  victory: 0.9,
+};
+const MUSIC_VOLUME = 0.35;
+const MUSIC_VOLUME_DUCKED = 0.1;
+const SOUND_MIN_GAP = 70;
+
+const soundBank = {};
+const soundLastPlayed = {};
+const endSounds = [];
+
+if (typeof Audio !== "undefined") {
+  for (const name of Object.keys(SOUND_FILES)) {
+    try {
+      const a = new Audio(encodeURI(SOUND_DIR + SOUND_FILES[name]));
+      a.preload = "auto";
+      soundBank[name] = a;
+    } catch {}
+  }
+}
+
+function playSound(name, rate = 1) {
+  const base = soundBank[name];
+  if (!base) return null;
+  const now = performance.now();
+  if (now - (soundLastPlayed[name] || 0) < SOUND_MIN_GAP) return null;
+  soundLastPlayed[name] = now;
+  try {
+    const a = base.cloneNode();
+    a.volume = SOUND_VOLUME[name] ?? 0.8;
+    a.playbackRate = rate;
+    const p = a.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+    return a;
+  } catch {
+    return null;
+  }
+}
+
+function playEndSound(name) {
+  const a = playSound(name);
+  if (a) endSounds.push(a);
+}
+function stopEndSounds() {
+  for (const a of endSounds) {
+    try {
+      a.pause();
+      a.currentTime = 0;
+    } catch {}
+  }
+  endSounds.length = 0;
+}
+function duckMusic(on) {
+  if (music) music.volume = on ? MUSIC_VOLUME_DUCKED : MUSIC_VOLUME;
+}
+
 const MUSIC_PATHS = [
+  SOUND_DIR + "backgroundmusic.mp3",
   "assets/lumine wave - Beyond the Blue.mp3",
   "lumine wave - Beyond the Blue.mp3",
 ];
@@ -1064,7 +1141,7 @@ function startMusic() {
   if (music || musicFailed || typeof Audio === "undefined") return;
   music = new Audio();
   music.loop = true;
-  music.volume = 0.35;
+  music.volume = state === "play" ? MUSIC_VOLUME : MUSIC_VOLUME_DUCKED;
   music.addEventListener("error", () => {
     musicTry++;
     if (musicTry < MUSIC_PATHS.length) {
@@ -1393,6 +1470,8 @@ class Player extends Actor {
       this.time >= this.dur() * 0.15
     ) {
       this.hitDone = true;
+      // sword swing sound (the lightning skill reuses it, deeper and slower)
+      playSound("sword", this.anim === "skill" ? 0.7 : 1);
       this.strike(this.anim);
     }
     if (this.onGround && this.anim === "jump") this.play("idle");
@@ -1496,6 +1575,8 @@ class Enemy extends Actor {
     } else if (this.cd <= 0) {
       this.vx = 0;
       this.play("attack", true);
+      // enemy attack sound: mushroom / goblin / golem each have their own
+      playSound(this.type === "golem" ? "golemAttack" : this.type);
       this.hitDone = false;
       this.cd = this.def.cd;
     } else {
@@ -1594,11 +1675,16 @@ function spawn(type) {
   const x = player.x + (spawnSide ? 1 : -1) * (W / 2 - 70);
   enemies.push(new Enemy(type, x, enemyChars[type]));
   burst(x, GROUND_Y, 14, "#7a5a3a", 220, 160);
-  if (type === "golem") shake = Math.max(shake, 0.3);
+  if (type === "golem") {
+    shake = Math.max(shake, 0.3);
+    playSound("golemSpawn");
+  }
 }
 
 function restart() {
   if (!swordChar || !petChar) return;
+  stopEndSounds();
+  duckMusic(false);
   player = new Player(swordChar);
   pet = new Pet(-120, petChar);
   enemies = [];
@@ -1663,6 +1749,8 @@ function updateGame(dt) {
     if (player.dead && player.done) {
       state = "lose";
       endT = 0;
+      duckMusic(true);
+      playEndSound("gameOver");
       return;
     }
 
@@ -1681,6 +1769,8 @@ function updateGame(dt) {
           score +
           Math.round(player.hp * 2) +
           Math.max(0, Math.round((120 - gameTime) * 2));
+        duckMusic(true);
+        playEndSound("victory");
       } else {
         nextWaveT = 2.4;
         player.hp = Math.min(player.maxHp, player.hp + 25);
