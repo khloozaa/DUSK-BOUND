@@ -8,8 +8,7 @@
 
 ![HTML5 Canvas](https://img.shields.io/badge/HTML5-Canvas-e34f26?style=for-the-badge&logo=html5&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-f7df1e?style=for-the-badge&logo=javascript&logoColor=black)
-![Hack Club Haven]([[https://img.shields.io/badge/Hack%20Club-Haven%20Cairo-ec3750?style=for-the-badge](https://haven.hackclub.com/cairo#about)](https://haven.hackclub.com/cairo#about))
-
+![Hack Club Haven](https://img.shields.io/badge/Hack%20Club-Haven%20Cairo-ec3750?style=for-the-badge)
 </div>
 
 ---
